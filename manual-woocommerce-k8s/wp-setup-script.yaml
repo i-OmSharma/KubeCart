@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wp-setup-script
+  namespace: store-manual-test
+data:
+  wp-setup.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "=== WooCommerce Compact Layout Script ==="
+
+    # 1. Wait for DB
+    until nc -z ${WORDPRESS_DB_HOST%:*} ${WORDPRESS_DB_HOST#*:} 2>/dev/null; do sleep 3; done
+    sleep 5
+
+    # 2. Core Setup
+    if [ ! -f /var/www/html/wp-config.php ]; then
+      wp core download --allow-root --force --skip-content
+      
+      cat << 'EOF' > /tmp/extra-php.txt
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+EOF
+
+      wp config create --dbname="${WORDPRESS_DB_NAME}" --dbuser="${WORDPRESS_DB_USER}" --dbpass="${WORDPRESS_DB_PASSWORD}" --dbhost="${WORDPRESS_DB_HOST}" --extra-php="$(cat /tmp/extra-php.txt)" --allow-root
+      wp core install --url="${WP_SITE_URL}" --title="${WC_STORE_NAME}" --admin_user="${WP_ADMIN_USER}" --admin_password="${WP_ADMIN_PASSWORD}" --admin_email="${WP_ADMIN_EMAIL}" --skip-email --allow-root
+    fi
+
+    # 3. Theme & Plugins
+    wp theme install storefront --activate --allow-root --force
+    wp plugin install woocommerce --activate --allow-root --force
+
+    # 4. --- CLEANUP & STYLING ---
+
+    # A. Delete Sample Page
+    wp post delete $(wp post list --post_type=page --name='sample-page' --format=ids --allow-root) --force --allow-root 2>/dev/null || true
+
+    # B. Minimalist Menu (Home, Cart, Checkout)
+    if wp menu list --fields=name --format=csv --allow-root | grep -q "Primary Menu"; then
+      wp menu delete "Primary Menu" --allow-root
+    fi
+    wp menu create "Primary Menu" --allow-root
+    wp menu location assign "Primary Menu" primary --allow-root
+
+    SHOP_ID=$(wp post list --post_type=page --name='shop' --format=ids --allow-root | head -n 1)
+    CART_ID=$(wp post list --post_type=page --name='cart' --format=ids --allow-root | head -n 1)
+    CHECK_ID=$(wp post list --post_type=page --name='checkout' --format=ids --allow-root | head -n 1)
+
+    if [ -n "$SHOP_ID" ]; then wp menu item add-post "Primary Menu" $SHOP_ID --title="Home" --allow-root; fi
+    if [ -n "$CART_ID" ]; then wp menu item add-post "Primary Menu" $CART_ID --title="Cart" --allow-root; fi
+    if [ -n "$CHECK_ID" ]; then wp menu item add-post "Primary Menu" $CHECK_ID --title="Checkout" --allow-root; fi
+
+    # C. Remove Widgets
+    wp widget reset sidebar-1 --allow-root
+
+    # D. Inject CSS (Compact Layout Fix)
+    wp eval '
+      $css = "
+      /* 1. Hide Elements */
+      .woocommerce-products-header__title.page-title,
+      .woocommerce-ordering, 
+      .woocommerce-result-count,
+      .site-search,
+      .woocommerce-breadcrumb,
+      .storefront-breadcrumb { display: none !important; }
+
+      /* 2. Remove Header Spacing */
+      .site-header { padding-bottom: 0 !important; margin-bottom: 10px !important; }
+      
+      /* 3. Remove Main Content Top/Bottom Spacing */
+      .site-content { padding-top: 10px !important; padding-bottom: 0 !important; }
+      .storefront-full-width-content .site-main { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+      
+      /* 4. Remove Product Grid Spacing */
+      ul.products { margin-top: 0 !important; padding-top: 0 !important; margin-bottom: 20px !important; }
+      
+      /* 5. Force Full Width */
+      .right-sidebar .content-area { width: 100% !important; float: none !important; }
+      ";
+      wp_update_custom_css_post($css);
+    ' --allow-root
+
+    # 5. Settings & Products
+    if ! wp post list --post_type=page --name=shop --format=ids --allow-root | grep -q .; then
+       wp wc tool run install_pages --user="${WP_ADMIN_USER}" --allow-root
+    fi
+    SHOP_ID=$(wp post list --post_type=page --name=shop --format=ids --allow-root | head -n 1)
+    if [ -n "$SHOP_ID" ]; then
+      wp option update show_on_front 'page' --allow-root
+      wp option update page_on_front $SHOP_ID --allow-root
+    fi
+
+    wp option update woocommerce_currency "${WC_STORE_CURRENCY}" --allow-root
+    wp option update woocommerce_cod_settings '{"enabled":"yes","title":"Cash on Delivery","description":"Pay upon delivery."}' --format=json --allow-root
+
+    echo "Refreshing Products..."
+    while IFS='|' read -r name price description; do
+      if [ -n "$name" ] && [ "$name" != " " ]; then
+        name=$(echo "$name" | xargs)
+        price=$(echo "$price" | xargs)
+        desc=$(echo "$description" | xargs)
+        SLUG=$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+        
+        if ! wp post list --post_type=product --name="$SLUG" --format=ids --allow-root | grep -q .; then
+          echo "Adding: $name"
+          wp wc product create --name="$name" --type=simple --regular_price="$price" --description="$desc" --status=publish --user="${WP_ADMIN_USER}" --allow-root
+        fi
+      fi
+    done <<< "$SAMPLE_PRODUCTS"
+
+    # 6. Fix HTTP -> HTTPS in database (idempotent, safe on every restart)
+    HTTP_URL="http://${WP_SITE_URL#https://}"
+    echo "Running search-replace: $HTTP_URL -> $WP_SITE_URL"
+    wp search-replace "$HTTP_URL" "$WP_SITE_URL" --skip-columns=guid --all-tables --allow-root
+
+    # 6.1 Inject HTTPS Fix into wp-config.php if missing
+    if grep -q "require_once ABSPATH . 'wp-settings.php';" /var/www/html/wp-config.php; then
+      if ! grep -q "HTTP_X_FORWARDED_PROTO" /var/www/html/wp-config.php; then
+        sed -i "/require_once ABSPATH . 'wp-settings.php';/i \
+if (isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {\n    \$_SERVER['HTTPS'] = 'on';\n}\n" /var/www/html/wp-config.php
+      fi
+    fi
+
+    # 7. Clear WooCommerce CSS/transient cache so assets regenerate with HTTPS URLs
+    wp transient delete --all --allow-root
+    wp eval 'if (function_exists("wc_delete_product_transients")) { wc_delete_product_transients(); }' --allow-root 2>/dev/null || true
+
+    echo "=== SETUP COMPLETE ==="
