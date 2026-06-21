@@ -1,0 +1,78 @@
+backend:
+  replicaCount: 1
+
+  image:
+    repository: store-factory-backend
+    tag: latest
+    pullPolicy: Never # IMPORTANT: using locally imported images
+
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+
+  env:
+    flaskEnv: production
+    databaseUrl: sqlite:///store_factory.db
+
+  resources:
+    requests:
+      cpu: 300m
+      memory: 256Mi
+    limits:
+      cpu: 800m
+      memory: 768Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    hosts:
+      - host: k8sapi.bakkathon.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: [] # TLS handled by outer Nginx (for now)
+
+frontend:
+  replicaCount: 1
+
+  image:
+    repository: store-factory-frontend
+    tag: latest
+    pullPolicy: Never # IMPORTANT
+
+  service:
+    type: ClusterIP # DO NOT use LoadBalancer on VPS
+    port: 80
+    targetPort: 80
+
+  env:
+    apiUrl: https://k8sapi.bakkathon.com/api
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    hosts:
+      - host: k8s.bakkathon.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: [] # TLS handled by outer Nginx
+
+secrets:
+  jwtSecretKey: CHANGE_THIS_TO_A_REAL_SECRET_KEY
+
+storeUrlSuffix: bakkathon.com

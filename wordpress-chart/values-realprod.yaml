@@ -1,0 +1,86 @@
+backend:
+  replicaCount: 1
+
+  image:
+    repository: store-factory-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+
+  env:
+    flaskEnv: production
+    databaseUrl: sqlite:///store_factory.db
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    hosts:
+      - host: k8sapi.bakkathon.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: backend-tls
+        hosts:
+          - k8sapi.bakkathon.com
+
+frontend:
+  replicaCount: 1
+
+  image:
+    repository: store-factory-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 80
+
+  env:
+    apiUrl: https://k8sapi.bakkathon.com/api
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: k8s.bakkathon.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: frontend-tls
+        hosts:
+          - k8s.bakkathon.com
+
+secrets:
+  jwtSecretKey: THIS_IS_A_PRODUCTION_SECRET_KEY_FOR_NOW
+
+storeUrlSuffix: bakkathon.com
