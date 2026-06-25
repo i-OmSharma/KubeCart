@@ -1,7 +1,28 @@
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, ScanSearch, Zap } from 'lucide-react';
 import StoreCard from './StoreCard';
 import StoreOverviewWidget from './StoreOverviewWidget';
 import StorageWidget from './StorageWidget';
+
+const AI_FEATURES = [
+  {
+    icon: Sparkles,
+    title: 'AI Product Generation',
+    badge: 'Llama 3.3',
+    desc: 'Describe your store in plain English — AI generates 5 ready-to-sell products with names, prices, and descriptions instantly.',
+  },
+  {
+    icon: ScanSearch,
+    title: 'AI Failure Diagnosis',
+    badge: 'Groq Powered',
+    desc: 'When a store fails, AI inspects live K8s pod logs and events to give you a plain-English root-cause analysis and fix guide.',
+  },
+  {
+    icon: Zap,
+    title: 'Instant K8s Provisioning',
+    badge: 'kind / K8s',
+    desc: 'Each store gets its own namespace, MySQL StatefulSet, WordPress deployment, PVC, and Ingress — fully isolated in seconds.',
+  },
+];
 
 export default function HomeView({ stores, userProfile, onLaunch, onSelectStore, onViewAll }) {
   const usedStorage = userProfile?.current_storage ?? 0;
@@ -60,6 +81,26 @@ export default function HomeView({ stores, userProfile, onLaunch, onSelectStore,
               ))}
             </div>
           )}
+        </div>
+
+        {/* AI Features — 12/12 */}
+        <div className="sm-ai-features-section">
+          <div className="sm-ai-features-head">
+            <span className="sm-ai-pill"><Sparkles size={11} /> AI Powered</span>
+            <h3 className="sm-recent-title">What KubeCart can do</h3>
+          </div>
+          <div className="sm-ai-features-grid">
+            {AI_FEATURES.map(({ icon: Icon, title, badge, desc }) => (
+              <div key={title} className="sm-ai-feature-card">
+                <div className="sm-ai-feature-top">
+                  <span className="sm-ai-feature-icon"><Icon size={18} /></span>
+                  <span className="sm-ai-feature-badge">{badge}</span>
+                </div>
+                <h4 className="sm-ai-feature-title">{title}</h4>
+                <p className="sm-ai-feature-desc">{desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>

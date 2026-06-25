@@ -127,6 +127,7 @@ export default function LaunchModal({ theme, onClose, onCreated, onError }) {
                 <button type="button" className={`sm-ai-toggle${aiMode ? ' active' : ''}`}
                   onClick={() => { setAiMode(v => !v); setAiError(null); }}>
                   <Sparkles size={11} /> {aiMode ? 'Manual' : 'AI Generate'}
+                  {!aiMode && <span className="sm-ai-toggle-badge">Llama 3.3</span>}
                 </button>
               </div>
 
