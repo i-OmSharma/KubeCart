@@ -12,6 +12,23 @@ axios.interceptors.request.use(config => {
   return config;
 });
 
+// Clear token and reload on 401 (expired / invalid)
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.dispatchEvent(new Event('kc:unauthorized'));
+    }
+    return Promise.reject(err);
+  }
+);
+
+export const register = async (username, email, password) => {
+  const response = await axios.post(`${API_URL}/auth/register`, { username, email, password });
+  return response.data;
+};
+
 export const login = async (username, password) => {
   const response = await axios.post(`${API_URL}/auth/login`, { username, password });
   if (response.data.access_token) {
@@ -42,4 +59,14 @@ export const deleteStore = async (storeId) => {
 export const getCurrentUser = async () => {
     const response = await axios.get(`${API_URL}/users/me`);
     return response.data;
+};
+
+export const generateProducts = async (prompt) => {
+  const response = await axios.post(`${API_URL}/ai/generate-products`, { prompt });
+  return response.data.products;
+};
+
+export const diagnoseStore = async (storeId) => {
+  const response = await axios.get(`${API_URL}/stores/${storeId}/diagnose`);
+  return response.data.diagnosis;
 };

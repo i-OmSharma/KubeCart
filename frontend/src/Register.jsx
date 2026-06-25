@@ -1,24 +1,34 @@
 import { useState } from 'react';
-import { login } from './api';
+import { register } from './api';
 import { Eye, EyeOff, Sun, Moon } from 'lucide-react';
 import BoxArt from './BoxArt';
 
-export default function Login({ onLogin, theme = 'dark', toggleTheme, onNavigate }) {
+export default function Register({ theme = 'dark', toggleTheme, onNavigate, onRegistered }) {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (password !== confirm) {
+      setError('Passwords do not match');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      await login(username, password);
-      await onLogin();
+      await register(username, email, password);
+      setSuccess(true);
+      setTimeout(() => onRegistered?.(), 1500);
     } catch (err) {
-      setError('Invalid credentials or server unreachable');
+      const msg = err.response?.data?.error || err.response?.data?.detail || 'Registration failed';
+      setError(msg);
       console.error(err);
     } finally {
       setLoading(false);
@@ -33,8 +43,8 @@ export default function Login({ onLogin, theme = 'dark', toggleTheme, onNavigate
           <button className="kc-theme-toggle" onClick={toggleTheme} title="Toggle theme">
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
-          <button className="kc-create-link" onClick={() => onNavigate('register')}>
-            SIGN UP
+          <button className="kc-create-link" onClick={() => onNavigate('login')}>
+            SIGN IN
           </button>
         </div>
       </header>
@@ -45,22 +55,23 @@ export default function Login({ onLogin, theme = 'dark', toggleTheme, onNavigate
           <div className="kc-brand">
             <BoxArt />
             <h1 className="kc-brand-name">KUBECART</h1>
-            <p className="kc-tagline">Spin up your WooCommerce store in<br />one click.</p>
+            <p className="kc-tagline">Deploy production-ready WooCommerce<br />stores on Kubernetes instantly.</p>
           </div>
         </section>
 
         {/* Right form panel */}
         <section className="kc-right">
           <div className="kc-form-wrap">
-            <h2 className="kc-title">Login</h2>
+            <h2 className="kc-title">Create<br />Account</h2>
 
             {error && <div className="kc-error">{error}</div>}
+            {success && <div className="kc-success">Account created! Redirecting…</div>}
 
             <form onSubmit={handleSubmit} className="kc-form">
               <div className="kc-field">
-                <label className="kc-label" htmlFor="kc-username">USERNAME</label>
+                <label className="kc-label" htmlFor="reg-username">USERNAME</label>
                 <input
-                  id="kc-username"
+                  id="reg-username"
                   type="text"
                   className="kc-input"
                   value={username}
@@ -72,16 +83,30 @@ export default function Login({ onLogin, theme = 'dark', toggleTheme, onNavigate
               </div>
 
               <div className="kc-field">
-                <label className="kc-label" htmlFor="kc-password">PASSWORD</label>
+                <label className="kc-label" htmlFor="reg-email">EMAIL ADDRESS</label>
+                <input
+                  id="reg-email"
+                  type="email"
+                  className="kc-input"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              <div className="kc-field">
+                <label className="kc-label" htmlFor="reg-password">PASSWORD</label>
                 <div className="kc-pw-wrap">
                   <input
-                    id="kc-password"
+                    id="reg-password"
                     type={showPassword ? 'text' : 'password'}
                     className="kc-input"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     required
                   />
                   <button
@@ -95,16 +120,32 @@ export default function Login({ onLogin, theme = 'dark', toggleTheme, onNavigate
                 </div>
               </div>
 
-              <div className="kc-row">
-                <label className="kc-remember">
-                  <input type="checkbox" className="kc-checkbox" />
-                  <span>Remember me</span>
-                </label>
-                <a href="#" className="kc-forgot">Forgot?</a>
+              <div className="kc-field">
+                <label className="kc-label" htmlFor="reg-confirm">CONFIRM PASSWORD</label>
+                <div className="kc-pw-wrap">
+                  <input
+                    id="reg-confirm"
+                    type={showConfirm ? 'text' : 'password'}
+                    className="kc-input"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="kc-eye"
+                    onClick={() => setShowConfirm((v) => !v)}
+                    tabIndex={-1}
+                  >
+                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
-              <button type="submit" className="kc-btn" disabled={loading}>
-                {loading ? 'Signing in…' : 'Sign In'}
+              <button type="submit" className="kc-btn" disabled={loading || success}>
+                {loading ? 'Creating account…' : 'Create Account'}
               </button>
             </form>
 
