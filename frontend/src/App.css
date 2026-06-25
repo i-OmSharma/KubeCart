@@ -802,6 +802,57 @@ body {
   margin: 0;
 }
 
+/* Feature list on login left panel */
+.kc-features {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kc-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kc-feature-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kc-accent);
+  margin-top: 1px;
+}
+
+.kc-root[data-theme="light"] .kc-feature-icon {
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.1);
+}
+
+.kc-feature-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--kc-text);
+  letter-spacing: 0.02em;
+}
+
+.kc-feature-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--kc-text-muted);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
 /* Right panel */
 .kc-right {
   width: 50%;
@@ -4286,6 +4337,114 @@ body {
 }
 
 .sm-ai-toggle:hover, .sm-ai-toggle.active { color: var(--sm-primary); border-color: var(--sm-primary); }
+
+.sm-ai-toggle-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: var(--sm-primary);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+  opacity: 0.85;
+}
+
+/* AI Features section on HomeView */
+.sm-ai-features-section {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sm-ai-features-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sm-ai-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--sm-primary);
+  background: color-mix(in srgb, var(--sm-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sm-primary) 30%, transparent);
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.sm-ai-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.sm-ai-feature-card {
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s;
+}
+
+.sm-ai-feature-card:hover {
+  border-color: color-mix(in srgb, var(--sm-primary) 40%, transparent);
+}
+
+.sm-ai-feature-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sm-ai-feature-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sm-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sm-primary) 20%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sm-primary);
+}
+
+.sm-ai-feature-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--sm-muted);
+  background: var(--sm-surface-low);
+  border: 1px solid var(--sm-border);
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+.sm-ai-feature-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sm-text);
+  margin: 0;
+}
+
+.sm-ai-feature-desc {
+  font-size: 0.75rem;
+  color: var(--sm-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .sm-ai-features-grid { grid-template-columns: 1fr; }
+}
 
 .sm-ai-section { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 
