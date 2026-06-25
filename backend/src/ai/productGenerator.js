@@ -1,10 +1,10 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const Groq = require('groq-sdk');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 async function generateProducts(userPrompt) {
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const message = await client.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
     max_tokens: 1000,
     messages: [
       {
@@ -24,7 +24,7 @@ Respond ONLY with valid JSON, no markdown, no explanation:
     ],
   });
 
-  const text = message.content[0].text;
+  const text = message.choices[0].message.content.trim();
   const parsed = JSON.parse(text);
   return parsed.products;
 }

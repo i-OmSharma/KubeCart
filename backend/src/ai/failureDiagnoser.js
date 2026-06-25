@@ -1,7 +1,7 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const Groq = require('groq-sdk');
 const { coreV1 } = require('../k8s/client');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 async function diagnoseFailure(namespace) {
   let podStatus = 'No pod data available.';
@@ -26,8 +26,8 @@ async function diagnoseFailure(namespace) {
       .join('\n') || 'No warning events.';
   } catch (_) {}
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const message = await client.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
     max_tokens: 500,
     messages: [
       {
@@ -50,7 +50,7 @@ Keep it under 100 words, clear and actionable.`,
     ],
   });
 
-  return message.content[0].text;
+  return message.choices[0].message.content.trim();
 }
 
 module.exports = { diagnoseFailure };
