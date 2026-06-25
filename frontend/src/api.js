@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use runtime config (for Docker/K8s) or build-time env (for local dev)
-const API_URL = window.ENV?.VITE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = window.ENV?.VITE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Add token to requests
 axios.interceptors.request.use(config => {
@@ -29,8 +29,8 @@ export const register = async (username, email, password) => {
   return response.data;
 };
 
-export const login = async (username, password) => {
-  const response = await axios.post(`${API_URL}/auth/login`, { username, password });
+export const login = async (email, password) => {
+  const response = await axios.post(`${API_URL}/auth/login`, { email, password });
   if (response.data.access_token) {
     localStorage.setItem('token', response.data.access_token);
   }

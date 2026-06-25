@@ -5,6 +5,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// Warm the pool on startup so first user request isn't slow (Neon cold start)
+pool.query('SELECT 1').catch(() => {});
+
 pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
