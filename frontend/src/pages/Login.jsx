@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { login } from '../api';
-import { Eye, EyeOff, Sun, Moon } from 'lucide-react';
+import { Eye, EyeOff, Sun, Moon, Sparkles, Zap, ShieldCheck, BarChart3 } from 'lucide-react';
 import BoxArt from '../components/BoxArt';
+
+const FEATURES = [
+  { icon: Zap,         label: 'One-click K8s provisioning', sub: 'WordPress + MySQL on Kubernetes in minutes' },
+  { icon: Sparkles,    label: 'AI product generation',      sub: 'Llama 3.3 populates your store automatically' },
+  { icon: ShieldCheck, label: 'AI failure diagnosis',       sub: 'Instant root-cause analysis for failed pods' },
+  { icon: BarChart3,   label: 'Real-time monitoring',       sub: 'Live store status, storage, and usage metrics' },
+];
 
 export default function Login({ onLogin, theme = 'dark', toggleTheme, onNavigate }) {
   const [email, setEmail] = useState('');
@@ -45,7 +52,18 @@ export default function Login({ onLogin, theme = 'dark', toggleTheme, onNavigate
           <div className="kc-brand">
             <BoxArt />
             <h1 className="kc-brand-name">KUBECART</h1>
-            <p className="kc-tagline">Spin up your WooCommerce store in<br />one click.</p>
+            <p className="kc-tagline">WooCommerce on Kubernetes,<br />powered by AI.</p>
+            <ul className="kc-features">
+              {FEATURES.map(({ icon: Icon, label, sub }) => (
+                <li key={label} className="kc-feature-item">
+                  <span className="kc-feature-icon"><Icon size={14} /></span>
+                  <span>
+                    <span className="kc-feature-label">{label}</span>
+                    <span className="kc-feature-sub">{sub}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
