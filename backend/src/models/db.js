@@ -1,30 +1,23 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, '../../../data/factory.db');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
-// Ensure data directory exists
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-
-const db = new Database(dbPath);
-
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-db.exec(`
+pool.query(`
   CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     max_stores INTEGER DEFAULT 3,
     max_storage_gi INTEGER DEFAULT 12,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT NOW()
   );
 
   CREATE TABLE IF NOT EXISTS stores (
     id TEXT PRIMARY KEY,
-    user_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
     namespace TEXT NOT NULL,
     status TEXT DEFAULT 'initialized',
     store_name TEXT,
@@ -32,9 +25,9 @@ db.exec(`
     products TEXT,
     storage_gi INTEGER DEFAULT 2,
     url TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    created_at TIMESTAMPTZ DEFAULT NOW()
   );
-`);
+`).then(() => console.log('DB schema ready'))
+  .catch(err => console.error('DB schema error:', err.message));
 
-module.exports = db;
+module.exports = pool;

@@ -10,10 +10,9 @@ const { diagnoseFailure } = require('../ai/failureDiagnoser');
 const router = express.Router();
 router.use(authMiddleware);
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const stores = storeModel.findByUser(req.user.userId);
-    // For provisioning stores, check actual K8s status
+    const stores = await storeModel.findByUser(req.user.userId);
     const enriched = stores.map(s => {
       if (s.status === 'provisioning') {
         k8sNamespace.getStatus(s.namespace).then(k8sStatus => {
@@ -45,7 +44,7 @@ router.get('/', (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const store = storeModel.findById(req.params.id);
+    const store = await storeModel.findById(req.params.id);
     if (!store) return res.status(404).json({ error: 'Store not found' });
     if (store.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
 
@@ -53,7 +52,7 @@ router.get('/:id', async (req, res) => {
     if (status === 'provisioning') {
       const k8sStatus = await k8sNamespace.getStatus(store.namespace);
       if (k8sStatus === 'ready' || k8sStatus === 'failed') {
-        storeModel.updateStatus(store.id, k8sStatus);
+        await storeModel.updateStatus(store.id, k8sStatus);
         status = k8sStatus;
       }
     }
@@ -113,7 +112,7 @@ router.post('/', async (req, res) => {
 
 router.get('/:id/diagnose', async (req, res) => {
   try {
-    const store = storeModel.findById(req.params.id);
+    const store = await storeModel.findById(req.params.id);
     if (!store) return res.status(404).json({ error: 'Store not found' });
     if (store.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
 
@@ -127,7 +126,7 @@ router.get('/:id/diagnose', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const store = storeModel.findById(req.params.id);
+    const store = await storeModel.findById(req.params.id);
     if (!store) return res.status(404).json({ error: 'Store not found' });
     if (store.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
 
@@ -139,12 +138,11 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// /api/users/me — kept in stores router for simplicity
-router.get('/user/me', (req, res) => {
+router.get('/user/me', async (req, res) => {
   try {
-    const user = userModel.findById(req.user.userId);
+    const user = await userModel.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const usage = userModel.getUsage(req.user.userId);
+    const usage = await userModel.getUsage(req.user.userId);
     res.json({
       username: user.email,
       email: user.email,

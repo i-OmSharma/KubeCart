@@ -6,19 +6,18 @@ const mysqlOps = require('../k8s/mysql');
 const wpOps = require('../k8s/wordpress');
 
 function genStoreId() {
-  return crypto.randomBytes(4).toString('hex'); // e.g. "a1b2c3d4"
+  return crypto.randomBytes(4).toString('hex');
 }
 
 async function createStore({ userId, storeName, adminPassword, storageGi, products }) {
-  const user = userModel.findById(userId);
+  const user = await userModel.findById(userId);
   if (!user) throw new Error('User not found');
 
-  // Quota check
-  const usage = userModel.getUsage(userId);
+  const usage = await userModel.getUsage(userId);
   if (usage.store_count >= user.max_stores) {
     throw new Error(`Store limit reached (max ${user.max_stores})`);
   }
-  const totalRequested = storageGi + 1; // +1 for MySQL
+  const totalRequested = storageGi + 1;
   if (usage.total_storage_gi + totalRequested > user.max_storage_gi) {
     throw new Error(`Storage limit reached (${user.max_storage_gi - usage.total_storage_gi}Gi available)`);
   }
@@ -28,36 +27,20 @@ async function createStore({ userId, storeName, adminPassword, storageGi, produc
   const suffix = process.env.STORE_URL_SUFFIX || 'localhost';
   const storeUrl = `http://store-${storeId}.${suffix}`;
 
-  // Register in DB first (so status is visible immediately)
-  storeModel.create({
-    id: storeId,
-    userId,
-    namespace,
-    storeName,
-    adminPassword,
-    products,
-    storageGi,
-    url: storeUrl,
-  });
-  storeModel.updateStatus(storeId, 'provisioning');
+  await storeModel.create({ id: storeId, userId, namespace, storeName, adminPassword, products, storageGi, url: storeUrl });
+  await storeModel.updateStatus(storeId, 'provisioning');
   console.log(`\n=== Creating store ${storeId} ===`);
 
   try {
-    // 1. Namespace
     await nsOps.create(namespace);
 
-    // 2. MySQL
     await mysqlOps.createSecret(namespace, adminPassword);
     await mysqlOps.createService(namespace);
     await mysqlOps.createStatefulSet(namespace);
 
-    // 3. Wait for MySQL — proper poll, no sleep(30)
     const mysqlReady = await mysqlOps.waitForReady(namespace);
-    if (!mysqlReady) {
-      throw new Error('MySQL did not become ready within 2 minutes');
-    }
+    if (!mysqlReady) throw new Error('MySQL did not become ready within 2 minutes');
 
-    // 4. WordPress
     await wpOps.createConfigMap(namespace, storeUrl, storeName, adminPassword, products);
     await wpOps.createSetupScriptConfigMap(namespace);
     await wpOps.createPVC(namespace, storageGi);
@@ -69,25 +52,24 @@ async function createStore({ userId, storeName, adminPassword, storageGi, produc
     return {
       id: storeId,
       namespace,
-      status: 'provisioning', // will become 'ready' once WP pod is up
+      status: 'provisioning',
       url: storeUrl,
       admin_url: `${storeUrl}/wp-admin`,
       admin_user: 'admin',
       admin_password: adminPassword,
     };
   } catch (err) {
-    // Rollback — delete namespace cascades all K8s resources
     console.error(`❌ Store ${storeId} failed: ${err.message}. Rolling back...`);
     try { await nsOps.del(namespace); } catch {}
-    storeModel.updateStatus(storeId, 'failed');
+    await storeModel.updateStatus(storeId, 'failed');
     throw err;
   }
 }
 
 async function deleteStore(store) {
-  storeModel.updateStatus(store.id, 'deleted');
+  await storeModel.updateStatus(store.id, 'deleted');
   await nsOps.del(store.namespace);
-  storeModel.remove(store.id);
+  await storeModel.remove(store.id);
   console.log(`✅ Store ${store.id} deleted`);
 }
 

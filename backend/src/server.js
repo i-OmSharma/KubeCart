@@ -28,18 +28,22 @@ app.use('/api/ai', aiRoutes);
 // /api/users/me — delegated to stores router via /user/me alias
 // Re-expose at the correct path
 const authMiddleware = require('./middleware/auth');
-app.get('/api/users/me', authMiddleware, (req, res) => {
-  const user = userModel.findById(req.user.userId);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const usage = userModel.getUsage(req.user.userId);
-  res.json({
-    username: user.email,
-    email: user.email,
-    max_stores: user.max_stores,
-    max_storage: user.max_storage_gi,
-    current_stores: usage.store_count,
-    current_storage: usage.total_storage_gi,
-  });
+app.get('/api/users/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await userModel.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const usage = await userModel.getUsage(req.user.userId);
+    res.json({
+      username: user.email,
+      email: user.email,
+      max_stores: user.max_stores,
+      max_storage: user.max_storage_gi,
+      current_stores: usage.store_count,
+      current_storage: usage.total_storage_gi,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {
