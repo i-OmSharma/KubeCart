@@ -70,6 +70,9 @@ stitch_minimalist_woocommerce_login/
 # ── Docker ────────────────────────────────────────────────────
 .docker/
 
+# ── WordPress prebaked image cache (large binaries, regenerate via wp-cli) ──
+backend/wp-cache/*.zip
+
 # ── Misc ──────────────────────────────────────────────────────
 *.bak
 *.tmp
