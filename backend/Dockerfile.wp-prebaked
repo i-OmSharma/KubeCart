@@ -1,0 +1,19 @@
+# Requires backend/wp-cache/{woocommerce,storefront}.zip to exist locally first
+# (gitignored — too large for source control). Fetch them with:
+#   curl -L https://downloads.wordpress.org/plugin/woocommerce.latest-stable.zip -o wp-cache/woocommerce.zip
+#   curl -L https://downloads.wordpress.org/theme/storefront.latest-stable.zip -o wp-cache/storefront.zip
+FROM wordpress:cli-php8.1
+
+USER root
+
+# Raise PHP memory limit for wp-cli extraction
+RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/wp-cli-memory.ini
+
+# Pre-cache WordPress core via wp-cli (populates /root/.wp-cli/cache/core/)
+RUN mkdir -p /tmp/wp-prebake && \
+    wp core download --path=/tmp/wp-prebake --allow-root && \
+    rm -rf /tmp/wp-prebake
+
+# Copy pre-downloaded zips — wp setup installs from local file, zero network per store
+COPY wp-cache/woocommerce.zip /wp-cache/woocommerce.zip
+COPY wp-cache/storefront.zip /wp-cache/storefront.zip

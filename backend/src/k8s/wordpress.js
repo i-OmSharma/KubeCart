@@ -13,20 +13,13 @@ sleep 5
 
 # Core install
 if [ ! -f /var/www/html/wp-config.php ]; then
-  wp core download --allow-root --force --skip-content
-
-  cat << 'PHPEOF' > /tmp/extra-php.txt
-$_SERVER['HTTPS'] = 'on';
-$_SERVER['SERVER_PORT'] = '443';
-define('FORCE_SSL_ADMIN', true);
-PHPEOF
+  wp core download --allow-root --skip-content
 
   wp config create \\
     --dbname="\${WORDPRESS_DB_NAME}" \\
     --dbuser="\${WORDPRESS_DB_USER}" \\
     --dbpass="\${WORDPRESS_DB_PASSWORD}" \\
     --dbhost="\${WORDPRESS_DB_HOST}" \\
-    --extra-php="$(cat /tmp/extra-php.txt)" \\
     --allow-root
 
   wp config set WP_HOME "\${WP_SITE_URL}" --type=constant --allow-root
@@ -43,8 +36,8 @@ PHPEOF
 fi
 
 # Theme and plugins
-wp theme install storefront --activate --allow-root --force
-wp plugin install woocommerce --activate --allow-root --force
+wp theme install /wp-cache/storefront.zip --activate --allow-root
+wp plugin install /wp-cache/woocommerce.zip --activate --allow-root
 
 # WooCommerce pages
 wp wc tool run install_pages --user="\${WP_ADMIN_USER}" --allow-root 2>/dev/null || true
@@ -80,10 +73,6 @@ while IFS='|' read -r name price description; do
     fi
   fi
 done <<< "\$SAMPLE_PRODUCTS"
-
-# Fix HTTP -> HTTPS in DB
-HTTP_URL="http://\${WP_SITE_URL#https://}"
-wp search-replace "$HTTP_URL" "\${WP_SITE_URL}" --skip-columns=guid --all-tables --allow-root
 
 wp transient delete --all --allow-root
 
@@ -164,7 +153,8 @@ async function createDeployment(namespace, storeUrl) {
         spec: {
           initContainers: [{
             name: 'wp-init',
-            image: 'wordpress:cli-php8.1',
+            image: 'kubecart/wp-prebaked:latest',
+            imagePullPolicy: 'Never',
             command: ['/bin/bash', '-c',
               'mkdir -p /tmp/conf.d && echo "memory_limit = 512M" > /tmp/conf.d/custom.ini && ' +
               'export PHP_INI_SCAN_DIR=:$PHP_INI_SCAN_DIR:/tmp/conf.d && ' +
@@ -193,7 +183,7 @@ async function createDeployment(namespace, storeUrl) {
               ...dbEnv,
               {
                 name: 'WORDPRESS_CONFIG_EXTRA',
-                value: `$_SERVER['HTTPS'] = 'on';\n$_SERVER['SERVER_PORT'] = '443';\ndefine('WP_HOME', '${storeUrlFull}');\ndefine('WP_SITEURL', '${storeUrlFull}');\ndefine('FORCE_SSL_ADMIN', true);\n`,
+                value: `define('WP_HOME', '${storeUrlFull}');\ndefine('WP_SITEURL', '${storeUrlFull}');\n`,
               },
             ],
             envFrom: [{ configMapRef: { name: 'wordpress-config' } }],
