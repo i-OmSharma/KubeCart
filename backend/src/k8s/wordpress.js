@@ -35,9 +35,18 @@ if [ ! -f /var/www/html/wp-config.php ]; then
     --allow-root
 fi
 
-# Theme and plugins
-wp theme install /wp-cache/storefront.zip --activate --allow-root
-wp plugin install /wp-cache/woocommerce.zip --activate --allow-root
+# Theme and plugins — use prebaked local zips if present (fast path, KIND-only),
+# otherwise fall back to installing from wordpress.org over the network
+if [ -f /wp-cache/storefront.zip ]; then
+  wp theme install /wp-cache/storefront.zip --activate --allow-root
+else
+  wp theme install storefront --activate --allow-root
+fi
+if [ -f /wp-cache/woocommerce.zip ]; then
+  wp plugin install /wp-cache/woocommerce.zip --activate --allow-root
+else
+  wp plugin install woocommerce --activate --allow-root
+fi
 
 # WooCommerce pages
 wp wc tool run install_pages --user="\${WP_ADMIN_USER}" --allow-root 2>/dev/null || true
@@ -153,8 +162,18 @@ async function createDeployment(namespace, storeUrl) {
         spec: {
           initContainers: [{
             name: 'wp-init',
-            image: 'kubecart/wp-prebaked:latest',
-            imagePullPolicy: 'Never',
+            // Prebaked image (WooCommerce/Storefront baked in) is local-KIND-only —
+            // it's built and `kind load docker-image`'d onto local nodes, never
+            // pushed to a registry. Falls back to the public wordpress:cli-php8.1
+            // image (installs WooCommerce/Storefront from the network per store)
+            // unless WP_INIT_IMAGE is explicitly set, e.g. to a pushed registry tag.
+            image: process.env.WP_INIT_IMAGE || 'wordpress:cli-php8.1',
+            imagePullPolicy: 'IfNotPresent',
+            // Some CSI provisioners (e.g. DO's block storage) mount the PVC
+            // owned by root; the stock wp-cli image's default user can't
+            // write to it. Force root explicitly rather than relying on the
+            // image's default user.
+            securityContext: { runAsUser: 0 },
             command: ['/bin/bash', '-c',
               'mkdir -p /tmp/conf.d && echo "memory_limit = 512M" > /tmp/conf.d/custom.ini && ' +
               'export PHP_INI_SCAN_DIR=:$PHP_INI_SCAN_DIR:/tmp/conf.d && ' +

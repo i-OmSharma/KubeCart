@@ -1,24 +1,31 @@
 # KubeCart
 
-Multi-tenant WooCommerce store provisioning platform on Kubernetes. Users
-sign up, hit "create store," and get an isolated, fully provisioned
-WordPress + WooCommerce site running in its own Kubernetes namespace — no
-manual setup, no shared infrastructure between tenants. AI features generate
-starter products from a one-line prompt and diagnose failed deployments in
-plain English.
+**Multi-tenant WooCommerce store provisioning platform, built on Kubernetes.**
 
-Tested end-to-end on a local KIND cluster: signup → provision → live
-storefront, verified working (2026-07-13).
+A customer signs up, hits "Create Store," and gets a fully isolated
+WordPress + WooCommerce storefront running in its own Kubernetes namespace —
+no manual server setup, no shared infrastructure between tenants. AI features
+generate starter products from a one-line prompt and turn a failed
+deployment into a plain-English diagnosis instead of raw `kubectl describe`
+output.
+
+> Tested end-to-end both locally (KIND) and in production (DigitalOcean
+> Kubernetes, HTTPS, Vercel frontend): signup → provision → live storefront,
+> verified working (2026-07-13).
+
+---
 
 ## Why this exists
 
 Spinning up a WooCommerce store normally means manually configuring a
 database, WordPress, a theme, plugins, and hosting — repeated per customer.
-KubeCart automates that whole path as a Kubernetes-native factory: one API
+KubeCart automates that entire path as a Kubernetes-native factory: one API
 call creates a fully isolated tenant (namespace, database, WordPress
-deployment, ingress route) with no manual intervention.
+deployment, ingress route), start to finish, with zero manual steps.
 
 ## Architecture
+
+![System design](docs/assets/sys.png)
 
 ```
                     ┌─────────────┐
@@ -44,16 +51,20 @@ deployment, ingress route) with no manual intervention.
 **One Kubernetes namespace per store.** Full tenant isolation — no shared
 database, no shared WordPress instance. Each namespace contains:
 
-- A MySQL `StatefulSet` (headless service, credentials in a `Secret`)
+- A MySQL `StatefulSet` (headless service, credentials in a `Secret`) —
+  stable network identity so WordPress's DB host config never breaks across
+  restarts
 - A WordPress `Deployment` with a `PersistentVolumeClaim`, configured via an
   init container running `wp-cli` (installs WordPress core, the Storefront
-  theme, and the WooCommerce plugin, seeds sample products)
+  theme, and the WooCommerce plugin, then seeds sample products)
 - An `Ingress` routing `store-<id>.<domain>` to the WordPress service
 
 Resource requests/limits are set on every container (100m/256Mi requests,
 500m/512Mi limits) so one noisy tenant can't starve the cluster.
 
 ## Stack
+
+![Tooling](docs/assets/tools.png)
 
 | Layer | Choice |
 |---|---|
@@ -65,9 +76,11 @@ Resource requests/limits are set on every container (100m/256Mi requests,
 | Frontend | React + Vite |
 | Local cluster | KIND (Kubernetes in Docker) |
 | Monitoring | Prometheus + Grafana (`kube-prometheus-stack` Helm chart) |
-| Production target | DigitalOcean (Kubernetes) — see [Production Setup](#production-setup-digitalocean) |
+| Production | Live on DigitalOcean Kubernetes (DOKS), ~$12/mo — see [Production Setup](#production-setup-digitalocean--live) |
 
-## Deliverables
+![Kubernetes fundamentals](docs/assets/k8s.png)
+
+## Project layout
 
 ```
 KubeCart/
@@ -79,9 +92,10 @@ KubeCart/
 │   │   ├── ai/           # productGenerator, failureDiagnoser (Groq)
 │   │   └── services/     # storeManager (orchestrates provisioning), cleanup
 │   ├── Dockerfile
-│   └── Dockerfile.wp-prebaked   # bakes WooCommerce/Storefront zips into WP init image
+│   └── Dockerfile.wp-prebaked   # bakes WooCommerce/Storefront zips into the WP init image
 ├── frontend/             # React + Vite dashboard
 ├── k8s/                  # KIND cluster config, RBAC, monitoring values
+├── wordpress-chart/      # Helm chart for deploying KubeCart itself (backend + frontend)
 └── docs/
     ├── monitoring.md     # Prometheus/Grafana setup + interview talking points
     └── my_learnings.md   # real bugs hit + fixed, with root cause and fix
@@ -96,7 +110,7 @@ KubeCart/
 - Store status polling — reflects live K8s state (`provisioning` → `ready` /
   `failed`)
 - `DELETE /api/stores/:id` — tears down the whole namespace (cascades every
-  resource in it)
+  resource inside it)
 - Background cleanup job — reaps stuck/orphaned provisioning attempts
 
 **AI-assisted**
@@ -104,12 +118,11 @@ KubeCart/
   leather wallets") into 5 realistic product listings with names, prices, and
   descriptions, ready to seed into a new store
 - `GET /api/stores/:id/diagnose` — reads pod status + K8s warning events for a
-  failed store's namespace and returns a plain-English explanation and fix,
-  instead of raw `kubectl describe` output
+  failed store's namespace and returns a plain-English explanation and fix
 
 **Monitoring**
 - Prometheus scrapes cluster/pod/namespace metrics
-- Grafana dashboards visualize them (see `docs/monitoring.md`)
+- Grafana dashboards visualize them — see `docs/monitoring.md`
 
 ## Reliability details worth knowing
 
@@ -155,7 +168,7 @@ kubectl -n ingress-nginx patch deployment ingress-nginx-controller --type=json -
 ]'
 ```
 
-Full writeup in `docs/my_learnings.md`.
+Full writeup with root cause in `docs/my_learnings.md`.
 
 ### 3. Backend
 
@@ -193,7 +206,9 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm install kube-prom prometheus-community/kube-prometheus-stack \
   -n monitoring --create-namespace -f k8s/monitoring/values.yaml
 ```
-See `docs/monitoring.md` for full details.
+
+See `docs/monitoring.md` for the full setup and why only Prometheus + Grafana
+were chosen (no Alertmanager, no Istio — kept deliberately minimal).
 
 ## Usage
 
@@ -236,34 +251,33 @@ Provisioning takes roughly 30-90 seconds (MySQL readiness + WordPress
 core/theme/plugin install). Visit the store at
 `http://store-<id>.localhost` once status is `ready`.
 
-## Production Setup (DigitalOcean)
+## Production Setup (DigitalOcean) — live
 
-Deployment target is **DigitalOcean Kubernetes (DOKS)** — a managed control
-plane means no etcd/apiserver babysitting, which keeps the ops story simple
-to explain in an interview while still being a real, standard production K8s
-setup. Frontend stays on Vercel (already deployed); DOKS hosts the backend
-+ WordPress factory only.
+Deployed and verified end-to-end: signup → login → store creation → live
+WooCommerce storefront, all over HTTPS. Backend runs on DOKS (managed
+control plane — no etcd/apiserver babysitting); frontend stays on Vercel.
 
-Cost-optimized to **~$24/mo total**, covered 8+ months by GitHub Student
-Pack credit — full breakdown and step-by-step commands in
-`docs/deployment.md`. Key choices:
+Shape:
+- **DOKS**, single `s-1vcpu-2gb` node, HA control plane explicitly disabled
+- **ingress-nginx** with `hostNetwork: true` instead of a DigitalOcean Load
+  Balancer — redundant with a single node, saves ~$12/mo
+- **cert-manager + Let's Encrypt**, bootstrapped to issue a real TLS cert
+  against `sslip.io` (no purchased domain needed), then **uninstalled**
+  once issued — the cert is just a `Secret` afterward and doesn't need the
+  controller running except to renew
+- **DigitalOcean Container Registry** for the backend image
+- **`sslip.io`** for wildcard DNS — every store gets
+  `store-<id>.<node-IP>.sslip.io` automatically, zero domain cost
+- Secrets (JWT secret, `DATABASE_URL`, `GROQ_API_KEY`) via a Kubernetes
+  `Secret`, never baked into the image
 
-- **1 node** (`s-2vcpu-4gb`), not a multi-node pool — enough headroom for
-  kube-system + ingress-nginx + backend + a couple of demo stores, without
-  paying for capacity this project doesn't need.
-- **No managed Load Balancer** — ingress-nginx runs with `hostNetwork: true`
-  directly on the single node's public IP instead. A DO LB's job is
-  spreading traffic across *multiple* nodes; with one node, it's a redundant
-  ~$12/mo.
-- **No cert-manager/domain** — no owned domain, so store URLs use
-  `sslip.io` (free wildcard DNS resolving `<anything>.<IP>.sslip.io` to
-  `<IP>`, zero signup) over plain HTTP.
-- **Monitoring stays local-only** — Prometheus/Grafana is fully tested on
-  the local KIND cluster (`docs/monitoring.md`) but not deployed to the
-  cloud cluster, to avoid competing with the actual app for the single
-  node's resources.
-- Secrets (JWT secret, `DATABASE_URL`, `GROQ_API_KEY`) via Kubernetes
-  `Secret` objects, never baked into images.
+**Total cost: ~$12/mo**, covered 16+ months by GitHub Student Pack credit.
+
+Full runbook with every bug hit and fixed along the way (wrong `doctl` HA
+default, two DO regions failing to provision, stale Python-era Dockerfile,
+a local-only image reference that only worked on one laptop, PVC write
+permissions, proxy timeouts, and an HTTP↔HTTPS redirect fight with the ACME
+challenge) is in `docs/deployment.md`.
 
 ## System design notes
 
@@ -303,11 +317,12 @@ kubectl logs -n store-{id} {wordpress-pod} -c wp-init
 kubectl get ingress -A
 kubectl -n ingress-nginx get pods -o wide   # check which node it's on
 ```
-See `docs/my_learnings.md` if it's Running but still unreachable.
+See `docs/my_learnings.md` if it's `Running` but still unreachable — this is
+usually a KIND port-mapping/node-scheduling issue, not a code bug.
 
 **WordPress init container stuck on `Init:ErrImageNeverPull`:**
 Rebuild and reload the prebaked image (see step 5 above) — this happens
-after any cluster recreate since the image cache is wiped.
+after any cluster recreate since the KIND node's image cache is wiped.
 
 **Backend can't create namespaces:**
 ```bash

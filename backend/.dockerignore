@@ -1,13 +1,14 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-instance/*.db
+node_modules/
+npm-debug.log*
+
+# Secrets — never bake into the image
+.env
+.env.*
+!.env.example
+
+# Local dev data
+data/
+wp-cache/
 
 # IDE
 .vscode/
@@ -24,11 +25,5 @@ instance/*.db
 *.md
 README.md
 
-# Tests
-tests/
-*.test.py
-
 # Misc
 .DS_Store
-.env.local
-.env.development

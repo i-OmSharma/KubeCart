@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubecart-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubecart-backend
+  template:
+    metadata:
+      labels:
+        app: kubecart-backend
+    spec:
+      serviceAccountName: store-factory
+      imagePullSecrets:
+        - name: kubecart
+      containers:
+        - name: backend
+          image: registry.digitalocean.com/kubecart/backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: STORE_URL_SUFFIX
+              value: "104.248.60.129.sslip.io"
+            - name: K8S_IN_CLUSTER
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: kubecart-backend-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubecart-backend
+spec:
+  selector:
+    app: kubecart-backend
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubecart-backend-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # Store creation blocks on MySQL readiness (up to 2 min) before responding
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "180"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "180"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.104.248.60.129.sslip.io
+      secretName: kubecart-backend-tls
+  rules:
+    - host: api.104.248.60.129.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kubecart-backend
+                port:
+                  number: 80
