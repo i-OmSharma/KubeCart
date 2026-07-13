@@ -43,11 +43,14 @@ yarn-error.log*
 pnpm-debug.log*
 
 # ── Helm ──────────────────────────────────────────────────────
-wordpress-chart/charts/
 *.tgz
 
-# ── Helm secret values (contain real creds) ───────────────────
-wordpress-chart/values-realprod.yaml
+# ── Stale pre-rewrite artifacts (kept locally, not on GitHub) ──
+# Flask/SQLite-era Helm chart and hand-written prototype manifests,
+# superseded by the dynamic Node.js provisioning backend + plain
+# manifests in docs/deployment.md.
+wordpress-chart/
+manual-woocommerce-k8s/
 
 # ── K8s generated / sensitive manifests ───────────────────────
 k8s/secrets/

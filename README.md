@@ -82,7 +82,6 @@ KubeCart/
 │   └── Dockerfile.wp-prebaked   # bakes WooCommerce/Storefront zips into WP init image
 ├── frontend/             # React + Vite dashboard
 ├── k8s/                  # KIND cluster config, RBAC, monitoring values
-├── wordpress-chart/      # Helm chart for deploying KubeCart itself (backend+frontend)
 └── docs/
     ├── monitoring.md     # Prometheus/Grafana setup + interview talking points
     └── my_learnings.md   # real bugs hit + fixed, with root cause and fix
@@ -242,23 +241,29 @@ core/theme/plugin install). Visit the store at
 Deployment target is **DigitalOcean Kubernetes (DOKS)** — a managed control
 plane means no etcd/apiserver babysitting, which keeps the ops story simple
 to explain in an interview while still being a real, standard production K8s
-setup.
+setup. Frontend stays on Vercel (already deployed); DOKS hosts the backend
++ WordPress factory only.
 
-> Full deployment steps (DOKS cluster creation, container registry, DNS,
-> cert-manager/Let's Encrypt, Helm values for prod) are being finalized —
-> see the deployment discussion for the current plan. The existing
-> `wordpress-chart/values-prod.yaml` predates the Node.js rewrite (still
-> references the old Flask/SQLite setup) and needs updating before it's
-> used for a real deploy.
+Cost-optimized to **~$24/mo total**, covered 8+ months by GitHub Student
+Pack credit — full breakdown and step-by-step commands in
+`docs/deployment.md`. Key choices:
 
-Planned shape:
-- **DOKS** cluster (managed control plane, node pool sized for demo load)
-- **DigitalOcean Container Registry** for backend/frontend images
-- **cert-manager + Let's Encrypt** for TLS on the ingress
-- **Wildcard DNS** (`*.yourdomain.com`) pointed at the DOKS load balancer,
-  so every store gets `store-<id>.yourdomain.com` automatically
+- **1 node** (`s-2vcpu-4gb`), not a multi-node pool — enough headroom for
+  kube-system + ingress-nginx + backend + a couple of demo stores, without
+  paying for capacity this project doesn't need.
+- **No managed Load Balancer** — ingress-nginx runs with `hostNetwork: true`
+  directly on the single node's public IP instead. A DO LB's job is
+  spreading traffic across *multiple* nodes; with one node, it's a redundant
+  ~$12/mo.
+- **No cert-manager/domain** — no owned domain, so store URLs use
+  `sslip.io` (free wildcard DNS resolving `<anything>.<IP>.sslip.io` to
+  `<IP>`, zero signup) over plain HTTP.
+- **Monitoring stays local-only** — Prometheus/Grafana is fully tested on
+  the local KIND cluster (`docs/monitoring.md`) but not deployed to the
+  cloud cluster, to avoid competing with the actual app for the single
+  node's resources.
 - Secrets (JWT secret, `DATABASE_URL`, `GROQ_API_KEY`) via Kubernetes
-  `Secret` objects, not baked into images or values files
+  `Secret` objects, never baked into images.
 
 ## System design notes
 
