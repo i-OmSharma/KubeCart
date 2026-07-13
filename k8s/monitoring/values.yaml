@@ -1,0 +1,40 @@
+# Minimal kube-prometheus-stack config for KubeCart (local KIND cluster).
+# Alertmanager disabled on purpose — keeps the stack to two moving parts
+# (Prometheus = collect+store metrics, Grafana = view them) for a simple story.
+
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 1d
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi
+    # scrape KubeCart-managed store namespaces too (they're created dynamically)
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  service:
+    type: NodePort
+    nodePort: 30080
+
+# Trim node-exporter/kube-state-metrics resources too — this is a laptop, not prod
+nodeExporter:
+  enabled: true
+kubeStateMetrics:
+  enabled: true
